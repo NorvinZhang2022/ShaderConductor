@@ -3,7 +3,9 @@
 
 set(SPIRV_Cross_REV "8891bd35120ca91c252a66ccfdc3f9a9d03c70cd")
 
-UpdateExternalLib("SPIRV-Cross" "https://github.com/KhronosGroup/SPIRV-Cross.git" ${SPIRV_Cross_REV})
+# UE Change Begin: Don't link CMake script with git to avoid mess with side branches.
+#UpdateExternalLib("SPIRV-Cross" "https://github.com/KhronosGroup/SPIRV-Cross.git" ${SPIRV_Cross_REV})
+# UE Change End: Don't link CMake script with git to avoid mess with side branches.
 
 add_subdirectory(SPIRV-Cross EXCLUDE_FROM_ALL)
 foreach(target

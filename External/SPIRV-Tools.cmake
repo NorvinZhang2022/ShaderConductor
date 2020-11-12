@@ -3,7 +3,9 @@
 
 set(SPIRV_Tools_REV "c341f7a6cd441d05ca1347ee39f2f03f32225c59")
 
-UpdateExternalLib("SPIRV-Tools" "https://github.com/KhronosGroup/SPIRV-Tools.git" ${SPIRV_Tools_REV})
+# UE Change Begin: Don't link CMake script with git to avoid mess with side branches.
+#UpdateExternalLib("SPIRV-Tools" "https://github.com/KhronosGroup/SPIRV-Tools.git" ${SPIRV_Tools_REV})
+# UE Change End: Don't link CMake script with git to avoid mess with side branches.
 
 set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
 add_subdirectory(SPIRV-Tools EXCLUDE_FROM_ALL)

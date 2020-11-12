@@ -3,7 +3,9 @@
 
 set(googletest_REV "dcc92d0ab6c4ce022162a23566d44f673251eee4")
 
-UpdateExternalLib("googletest" "https://github.com/google/googletest.git" ${googletest_REV})
+# UE Change Begin: Don't link CMake script with git to avoid mess with side branches.
+#UpdateExternalLib("googletest" "https://github.com/google/googletest.git" ${googletest_REV})
+# UE Change End: Don't link CMake script with git to avoid mess with side branches.
 
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)

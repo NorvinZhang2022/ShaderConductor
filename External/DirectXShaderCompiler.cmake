@@ -3,7 +3,9 @@
 
 set(DirectXShaderCompiler_REV "634a23537df7e85512437a4976f9bf9fcd095e18")
 
-UpdateExternalLib("DirectXShaderCompiler" "https://github.com/Microsoft/DirectXShaderCompiler.git" ${DirectXShaderCompiler_REV})
+# UE Change Begin: Don't link CMake script with git to avoid mess with side branches.
+#UpdateExternalLib("DirectXShaderCompiler" "https://github.com/Microsoft/DirectXShaderCompiler.git" ${DirectXShaderCompiler_REV})
+# UE Change End: Don't link CMake script with git to avoid mess with side branches.
 
 set(ENABLE_SPIRV_CODEGEN ON CACHE BOOL "" FORCE)
 set(CLANG_ENABLE_ARCMT OFF CACHE BOOL "" FORCE)
