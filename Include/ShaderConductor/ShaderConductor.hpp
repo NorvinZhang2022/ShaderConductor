@@ -177,6 +177,9 @@ namespace ShaderConductor
             // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
             bool removeUnusedGlobals = false;
             // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
+            // UE Change Begin: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
+            bool enableFMAPass = false;
+            // UE Change End: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
 
             int optimizationLevel = 3; // 0 to 3, no optimization to most optimization
             ShaderModel shaderModel = {6, 0};
@@ -192,6 +195,11 @@ namespace ShaderConductor
             ShadingLanguage language;
             const char* version;
             bool asModule;
+
+            // UE Change Begin: Support reflection & overriding Metal options & resource bindings to generate correct code.
+            const MacroDefine* options;
+            uint32_t numOptions;
+            // UE Change End: Support reflection & overriding Metal options & resource bindings to generate correct code.
         };
 
         struct ReflectionDesc
@@ -248,6 +256,14 @@ namespace ShaderConductor
         static void Compile(const SourceDesc& source, const Options& options, const TargetDesc* targets, uint32_t numTargets,
                             ResultDesc* results);
         static ResultDesc Disassemble(const DisassembleDesc& source);
+
+        // UE Change Begin: Two stage compilation is preferable for UE4 as it avoids polluting SC with SPIRV->MSL complexities.
+        static ResultDesc ConvertBinary(const ResultDesc& binaryResult, const SourceDesc& source, const Compiler::Options& options,
+                                        const TargetDesc& target);
+        // UE Change End: Two stage compilation is preferable for UE4 as it avoids polluting SC with SPIRV->MSL complexities.
+        // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+        static ResultDesc Rewrite(SourceDesc source, const Compiler::Options& options);
+        // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
         // Currently only Dxil on Windows supports linking
         static bool LinkSupport();

@@ -776,6 +776,24 @@ namespace
         case ShadingLanguage::Msl_macOS:
         case ShadingLanguage::Msl_iOS:
             dxcArgStrings.push_back(L"-spirv");
+            // UE Change Begin: Use UE5 specific layout rules
+            dxcArgStrings.push_back(L"-fvk-ue5-layout");
+            // UE Change End: 
+            // UE Change Begin: Proper fix for SV_Position.w being inverted in SPIRV & Metal vs. D3D.
+            if (targetLanguage != ShadingLanguage::Hlsl)
+                dxcArgStrings.push_back(L"-fvk-use-dx-position-w");
+            // UE Change End: Proper fix for SV_Position.w being inverted in SPIRV & Metal vs. D3D.
+            // UE Change Begin: Specify SPIRV reflection so that we retain semantic strings.
+            dxcArgStrings.push_back(L"-fspv-reflect");
+            // UE Change End: Specify SPIRV reflection so that we retain semantic strings.
+            // UE Change Begin: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
+            if (targetLanguage == ShadingLanguage::Msl_macOS || targetLanguage == ShadingLanguage::Msl_iOS || options.enableFMAPass)
+                dxcArgStrings.push_back(L"-fspv-fusemuladd");
+            // UE Change End: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
+            // UE Change Begin: Emit SPIRV debug info when asked to.
+            if (options.enableDebugInfo)
+                dxcArgStrings.push_back(L"-fspv-debug=line");
+            // UE Change End: Emit SPIRV debug info when asked to.
             break;
 
         default:
@@ -984,6 +1002,112 @@ namespace
                 mslOpts.msl_version = opts.version;
             }
             mslOpts.swizzle_texture_samples = false;
+
+            // UE Change Begin: Ensure base vertex and instance indices start with zero if source language is HLSL.
+            mslOpts.enable_base_index_zero = true;
+            // UE Change End: Ensure base vertex and instance indices start with zero if source language is HLSL.
+
+            // UE Change Begin: Support reflection & overriding Metal options & resource bindings to generate correct code.
+            for (unsigned i = 0; i < target.numOptions; i++)
+            {
+                auto& Define = target.options[i];
+                if (!strcmp(Define.name, "ios_support_base_vertex_instance"))
+                {
+                    mslOpts.ios_support_base_vertex_instance = (std::stoi(Define.value) != 0);
+                }
+                if (!strcmp(Define.name, "swizzle_texture_samples"))
+                {
+                    mslOpts.swizzle_texture_samples = (std::stoi(Define.value) != 0);
+                }
+                if (!strcmp(Define.name, "texel_buffer_texture_width"))
+                {
+                    mslOpts.texel_buffer_texture_width = (uint32_t)std::stoi(Define.value);
+                }
+                // Use Metal's native texture-buffer type for HLSL buffers.
+                if (!strcmp(Define.name, "texture_buffer_native"))
+                {
+                    mslOpts.texture_buffer_native = (std::stoi(Define.value) != 0);
+                }
+#if 0 // WIP
+                // Use Metal's native frame-buffer fetch API for subpass inputs.
+                if (!strcmp(Define.name, "ios_use_framebuffer_fetch_subpasses"))
+                {
+                    mslOpts.ios_use_framebuffer_fetch_subpasses = (std::stoi(Define.value) != 0);
+                }
+                // Storage buffer robustness - clamps access to SSBOs to the size of the buffer.
+                if (!strcmp(Define.name, "enforce_storge_buffer_bounds"))
+                {
+                    mslOpts.enforce_storge_buffer_bounds = (std::stoi(Define.value) != 0);
+                }
+#endif
+                if (!strcmp(Define.name, "buffer_size_buffer_index"))
+                {
+                    mslOpts.buffer_size_buffer_index = (uint32_t)std::stoi(Define.value);
+                }
+                // Capture shader output to a buffer - used for vertex streaming to emulate GS & Tess.
+                if (!strcmp(Define.name, "capture_output_to_buffer"))
+                {
+                    mslOpts.capture_output_to_buffer = (std::stoi(Define.value) != 0);
+                }
+                if (!strcmp(Define.name, "shader_output_buffer_index"))
+                {
+                    mslOpts.shader_output_buffer_index = (uint32_t)std::stoi(Define.value);
+                }
+                // Allow the caller to specify the various auxiliary Metal buffer indices.
+                if (!strcmp(Define.name, "indirect_params_buffer_index"))
+                {
+                    mslOpts.indirect_params_buffer_index = (uint32_t)std::stoi(Define.value);
+                }
+                if (!strcmp(Define.name, "shader_patch_output_buffer_index"))
+                {
+                    mslOpts.shader_patch_output_buffer_index = (uint32_t)std::stoi(Define.value);
+                }
+                if (!strcmp(Define.name, "shader_tess_factor_buffer_index"))
+                {
+                    mslOpts.shader_tess_factor_buffer_index = (uint32_t)std::stoi(Define.value);
+                }
+                if (!strcmp(Define.name, "shader_input_wg_index"))
+                {
+                    mslOpts.shader_input_wg_index = (uint32_t)std::stoi(Define.value);
+                }
+                // Allow the caller to specify the Metal translation should use argument buffers.
+                if (!strcmp(Define.name, "argument_buffers"))
+                {
+                    mslOpts.argument_buffers = (std::stoi(Define.value) != 0);
+                }
+#if 0//WIP
+                if (!strcmp(Define.name, "argument_buffer_offset"))
+                {
+                    mslOpts.argument_buffer_offset = (uint32_t)std::stoi(Define.value);
+                }
+#endif
+                if (!strcmp(Define.name, "invariant_float_math"))
+                {
+                    mslOpts.invariant_float_math = (std::stoi(Define.value) != 0);
+                }
+                // Emulate texturecube_array with texture2d_array for iOS where this type is not available.
+                if (!strcmp(Define.name, "emulate_cube_array"))
+                {
+                    mslOpts.emulate_cube_array = (std::stoi(Define.value) != 0);
+                }
+                // Allow user to enable decoration binding.
+                if (!strcmp(Define.name, "enable_decoration_binding"))
+                {
+                    mslOpts.enable_decoration_binding = (std::stoi(Define.value) != 0);
+                }
+#if 0//WIP
+                // Specify dimension of subpass input attachments.
+                static const char* subpassInputDimIdent = "subpass_input_dimension";
+                static const size_t subpassInputDimIdentLen = std::strlen(subpassInputDimIdent);
+                if (!strncmp(Define.name, subpassInputDimIdent, subpassInputDimIdentLen))
+                {
+                    int binding = std::stoi(Define.name + subpassInputDimIdentLen);
+                    mslOpts.subpass_input_dimensions[static_cast<uint32_t>(binding)] = std::stoi(Define.value);
+                }
+#endif
+            }
+            // UE Change End: Support reflection & overriding Metal options & resource bindings to generate correct code.
+
             mslOpts.platform = (target.language == ShadingLanguage::Msl_iOS) ? spirv_cross::CompilerMSL::Options::iOS
                                                                              : spirv_cross::CompilerMSL::Options::macOS;
 
@@ -1063,7 +1187,13 @@ namespace
         return ret;
     }
 
-    Compiler::ResultDesc ConvertBinary(const Compiler::ResultDesc& binaryResult, const Compiler::SourceDesc& source,
+// UE Change Begin: Two stage compilation is preferable for UE4 as it avoids polluting SC with SPIRV->MSL complexities.
+} // namespace
+namespace ShaderConductor
+{
+// UE Change End: Two stage compilation is preferable for UE4 as it avoids polluting SC with SPIRV->MSL complexities.
+
+    Compiler::ResultDesc Compiler::ConvertBinary(const Compiler::ResultDesc& binaryResult, const Compiler::SourceDesc& source,
                                        const Compiler::Options& options, const Compiler::TargetDesc& target)
     {
         if (!binaryResult.hasError)
@@ -1328,6 +1458,21 @@ namespace ShaderConductor
 
         return ret;
     }
+
+	// UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+    Compiler::ResultDesc Compiler::Rewrite(SourceDesc source, const Compiler::Options& options)
+    {
+        if (source.entryPoint == nullptr)
+        {
+            source.entryPoint = "main";
+        }
+        if (!source.loadIncludeCallback)
+        {
+            source.loadIncludeCallback = DefaultLoadCallback;
+        }
+        return RewriteHlsl(source, options);
+    }
+    // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
     bool Compiler::LinkSupport()
     {
