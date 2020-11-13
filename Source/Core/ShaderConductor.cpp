@@ -38,6 +38,9 @@
 
 #include <dxc/DxilContainer/DxilContainer.h>
 #include <dxc/dxcapi.h>
+// UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+#include <dxc/dxctools.h>
+// UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 #include <llvm/Support/ErrorHandling.h>
 
 #include <spirv-tools/libspirv.h>
@@ -84,6 +87,13 @@ namespace
             return m_compiler;
         }
 
+        // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+        IDxcRewriter* Rewriter() const
+        {
+            return m_rewriter;
+        }
+        // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
+
         IDxcContainerReflection* ContainerReflection() const
         {
             return m_containerReflection;
@@ -128,6 +138,9 @@ namespace
                 m_compiler.Detach();
                 m_library.Detach();
                 m_containerReflection.Detach();
+                // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+                m_rewriter.Detach();
+                // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
                 m_createInstanceFunc = nullptr;
 
@@ -172,6 +185,9 @@ namespace
                     IFT(m_createInstanceFunc(CLSID_DxcCompiler, __uuidof(IDxcCompiler), reinterpret_cast<void**>(&m_compiler)));
                     IFT(m_createInstanceFunc(CLSID_DxcContainerReflection, __uuidof(IDxcContainerReflection),
                                              reinterpret_cast<void**>(&m_containerReflection)));
+                    // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+                    IFT(m_createInstanceFunc(CLSID_DxcRewriter, __uuidof(IDxcRewriter), reinterpret_cast<void**>(&m_rewriter)));
+                    // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
                 }
                 else
                 {
@@ -195,6 +211,9 @@ namespace
         CComPtr<IDxcLibrary> m_library;
         CComPtr<IDxcCompiler> m_compiler;
         CComPtr<IDxcContainerReflection> m_containerReflection;
+        // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+        CComPtr<IDxcRewriter> m_rewriter;
+        // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
         bool m_linkerSupport;
     };
@@ -311,6 +330,108 @@ namespace
         result.errorWarningMsg.Reset(errorMSg.data(), static_cast<uint32_t>(errorMSg.size()));
         result.hasError = true;
     }
+
+    // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+    Compiler::ResultDesc RewriteHlsl(const Compiler::SourceDesc& source, const Compiler::Options& options)
+    {
+        CComPtr<IDxcBlobEncoding> sourceBlob;
+        IFT(Dxcompiler::Instance().Library()->CreateBlobWithEncodingOnHeapCopy(source.source, static_cast<UINT32>(strlen(source.source)),
+                                                                               CP_UTF8, &sourceBlob));
+        IFTARG(sourceBlob->GetBufferSize() >= 4);
+
+        std::wstring shaderNameUtf16;
+        Unicode::UTF8ToUTF16String(source.fileName, &shaderNameUtf16);
+
+        std::wstring entryPointUtf16;
+        Unicode::UTF8ToUTF16String(source.entryPoint, &entryPointUtf16);
+
+        std::vector<DxcDefine> dxcDefines;
+        std::vector<std::wstring> dxcDefineStrings;
+        // Need to reserve capacity so that small-string optimization does not
+        // invalidate the pointers to internal string data while resizing.
+        dxcDefineStrings.reserve(source.numDefines * 2);
+        for (size_t i = 0; i < source.numDefines; ++i)
+        {
+            const auto& define = source.defines[i];
+
+            std::wstring nameUtf16Str;
+            Unicode::UTF8ToUTF16String(define.name, &nameUtf16Str);
+            dxcDefineStrings.emplace_back(std::move(nameUtf16Str));
+            const wchar_t* nameUtf16 = dxcDefineStrings.back().c_str();
+
+            const wchar_t* valueUtf16;
+            if (define.value != nullptr)
+            {
+                std::wstring valueUtf16Str;
+                Unicode::UTF8ToUTF16String(define.value, &valueUtf16Str);
+                dxcDefineStrings.emplace_back(std::move(valueUtf16Str));
+                valueUtf16 = dxcDefineStrings.back().c_str();
+            }
+            else
+            {
+                valueUtf16 = nullptr;
+            }
+
+            dxcDefines.push_back({nameUtf16, valueUtf16});
+        }
+
+        CComPtr<IDxcOperationResult> rewriteResult;
+        CComPtr<IDxcIncludeHandler> includeHandler = new ScIncludeHandler(std::move(source.loadIncludeCallback));
+        IFT(Dxcompiler::Instance().Rewriter()->RewriteUnchangedWithInclude(sourceBlob, shaderNameUtf16.c_str(), dxcDefines.data(),
+                                                                           static_cast<UINT32>(dxcDefines.size()), includeHandler, 0,
+                                                                           &rewriteResult));
+
+        HRESULT statusRewrite;
+        IFT(rewriteResult->GetStatus(&statusRewrite));
+
+        Compiler::ResultDesc ret = {};
+        ret.isText = true;
+        ret.hasError = true;
+
+        if (SUCCEEDED(statusRewrite))
+        {
+            CComPtr<IDxcBlobEncoding> rewritten;
+
+            CComPtr<IDxcBlobEncoding> temp;
+            IFT(rewriteResult->GetResult((IDxcBlob**)&temp));
+
+            if (options.removeUnusedGlobals)
+            {
+                CComPtr<IDxcOperationResult> removeUnusedGlobalsResult;
+                IFT(Dxcompiler::Instance().Rewriter()->RemoveUnusedGlobals(
+                    temp, entryPointUtf16.c_str(), dxcDefines.data(), static_cast<UINT32>(dxcDefines.size()), &removeUnusedGlobalsResult));
+                IFT(removeUnusedGlobalsResult->GetStatus(&statusRewrite));
+
+                if (SUCCEEDED(statusRewrite))
+                {
+                    IFT(removeUnusedGlobalsResult->GetResult((IDxcBlob**)&rewritten));
+                    ret.hasError = false;
+                    ret.target.Reset(rewritten->GetBufferPointer(), static_cast<uint32_t>(rewritten->GetBufferSize()));
+                }
+                else
+                {
+                    CComPtr<IDxcBlobEncoding> errorMsg;
+                    IFT(removeUnusedGlobalsResult->GetErrorBuffer((IDxcBlobEncoding**)&errorMsg));
+                    ret.errorWarningMsg.Reset(errorMsg->GetBufferPointer(), static_cast<uint32_t>(errorMsg->GetBufferSize()));
+                }
+            }
+            else
+            {
+                IFT(rewriteResult->GetResult((IDxcBlob**)&rewritten));
+                ret.hasError = false;
+                ret.target.Reset(rewritten->GetBufferPointer(), static_cast<uint32_t>(rewritten->GetBufferSize()));
+            }
+        }
+        else
+        {
+            CComPtr<IDxcBlobEncoding> errorMsg;
+            IFT(rewriteResult->GetErrorBuffer((IDxcBlobEncoding**)&errorMsg));
+            ret.errorWarningMsg.Reset(errorMsg->GetBufferPointer(), static_cast<uint32_t>(errorMsg->GetBufferSize()));
+        }
+
+        return ret;
+    }
+    // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
 #ifdef LLVM_ON_WIN32
     template <typename T>

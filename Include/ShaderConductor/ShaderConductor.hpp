@@ -174,6 +174,9 @@ namespace ShaderConductor
             bool enableDebugInfo = false;                // Embed debug info into the binary
             bool disableOptimizations = false;           // Force to turn off optimizations. Ignore optimizationLevel below.
             bool inheritCombinedSamplerBindings = false; // If textures and samplers are combined, inherit the binding of the texture
+            // UE Change Begin: Add functionality to rewrite HLSL to remove unused code and globals.
+            bool removeUnusedGlobals = false;
+            // UE Change End: Add functionality to rewrite HLSL to remove unused code and globals.
 
             int optimizationLevel = 3; // 0 to 3, no optimization to most optimization
             ShaderModel shaderModel = {6, 0};
