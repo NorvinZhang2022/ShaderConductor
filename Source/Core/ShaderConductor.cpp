@@ -1028,18 +1028,16 @@ namespace
                 {
                     mslOpts.texture_buffer_native = (std::stoi(Define.value) != 0);
                 }
-#if 0 // WIP
                 // Use Metal's native frame-buffer fetch API for subpass inputs.
-                if (!strcmp(Define.name, "ios_use_framebuffer_fetch_subpasses"))
+                if (!strcmp(Define.name, "use_framebuffer_fetch_subpasses"))
                 {
-                    mslOpts.ios_use_framebuffer_fetch_subpasses = (std::stoi(Define.value) != 0);
+                    mslOpts.use_framebuffer_fetch_subpasses = (std::stoi(Define.value) != 0);
                 }
                 // Storage buffer robustness - clamps access to SSBOs to the size of the buffer.
                 if (!strcmp(Define.name, "enforce_storge_buffer_bounds"))
                 {
                     mslOpts.enforce_storge_buffer_bounds = (std::stoi(Define.value) != 0);
                 }
-#endif
                 if (!strcmp(Define.name, "buffer_size_buffer_index"))
                 {
                     mslOpts.buffer_size_buffer_index = (uint32_t)std::stoi(Define.value);
@@ -1075,12 +1073,10 @@ namespace
                 {
                     mslOpts.argument_buffers = (std::stoi(Define.value) != 0);
                 }
-#if 0//WIP
                 if (!strcmp(Define.name, "argument_buffer_offset"))
                 {
                     mslOpts.argument_buffer_offset = (uint32_t)std::stoi(Define.value);
                 }
-#endif
                 if (!strcmp(Define.name, "invariant_float_math"))
                 {
                     mslOpts.invariant_float_math = (std::stoi(Define.value) != 0);
@@ -1095,7 +1091,6 @@ namespace
                 {
                     mslOpts.enable_decoration_binding = (std::stoi(Define.value) != 0);
                 }
-#if 0//WIP
                 // Specify dimension of subpass input attachments.
                 static const char* subpassInputDimIdent = "subpass_input_dimension";
                 static const size_t subpassInputDimIdentLen = std::strlen(subpassInputDimIdent);
@@ -1104,7 +1099,6 @@ namespace
                     int binding = std::stoi(Define.name + subpassInputDimIdentLen);
                     mslOpts.subpass_input_dimensions[static_cast<uint32_t>(binding)] = std::stoi(Define.value);
                 }
-#endif
             }
             // UE Change End: Support reflection & overriding Metal options & resource bindings to generate correct code.
 
