@@ -961,16 +961,35 @@ namespace
         }
         opts.es = (target.language == ShadingLanguage::Essl);
         opts.force_temporary = false;
-        opts.separate_shader_objects = true;
+        opts.separate_shader_objects = !opts.es;
         opts.flatten_multidimensional_arrays = false;
         opts.enable_420pack_extension =
             (target.language == ShadingLanguage::Glsl) && ((target.version == nullptr) || (opts.version >= 420));
         opts.vulkan_semantics = false;
-        opts.vertex.fixup_clipspace = false;
-        opts.vertex.flip_vert_y = false;
+        opts.vertex.fixup_clipspace = opts.es;
+        opts.vertex.flip_vert_y = opts.es;
         opts.vertex.support_nonzero_base_instance = true;
         compiler->set_common_options(opts);
 
+        // UE Change Begin: Allow variable typenames to be renamed to support samplerExternalOES in ESSL.
+		if (target.language == ShadingLanguage::Essl)
+        {
+            if (target.variableTypeRenameCallback)
+            {
+                compiler->set_variable_type_remap_callback(
+                    [&target](const spirv_cross::SPIRType&, const std::string& var_name, std::string& name_of_type)
+                    {
+                        if (Blob* Result = target.variableTypeRenameCallback(var_name.c_str(), name_of_type.c_str()))
+                        {
+                            name_of_type = (char const*)Result->Data();
+                            DestroyBlob(Result);
+                        }
+                    }
+                );
+            }
+        }
+        else
+        // UE Change End: Allow variable typenames to be renamed to support samplerExternalOES in ESSL.
         if (target.language == ShadingLanguage::Hlsl)
         {
             auto* hlslCompiler = static_cast<spirv_cross::CompilerHLSL*>(compiler.get());
@@ -1314,6 +1333,17 @@ namespace ShaderConductor
         return m_impl ? m_impl->Size() : 0;
     }
 
+    // UE Change Begin: Allow custom instances of <Blob> interface.
+    Blob* CreateBlob(const void* data, uint32_t size)
+    {
+        return new ScBlob(data, size);
+    }
+
+    void DestroyBlob(Blob* blob)
+    {
+        delete blob;
+    }
+    // UE Change End: Allow custom instances of <Blob> interface.
 
     Compiler::ResultDesc Compiler::Compile(const SourceDesc& source, const Options& options, const TargetDesc& target)
     {
