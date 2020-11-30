@@ -979,10 +979,10 @@ namespace
                 compiler->set_variable_type_remap_callback(
                     [&target](const spirv_cross::SPIRType&, const std::string& var_name, std::string& name_of_type)
                     {
-                        if (Blob* Result = target.variableTypeRenameCallback(var_name.c_str(), name_of_type.c_str()))
+                        Blob Result = target.variableTypeRenameCallback(var_name.c_str(), name_of_type.c_str());
+                        if (Result.Size() > 0)
                         {
-                            name_of_type = (char const*)Result->Data();
-                            DestroyBlob(Result);
+                            name_of_type = (char const*)Result.Data();
                         }
                     }
                 );
@@ -1332,18 +1332,6 @@ namespace ShaderConductor
     {
         return m_impl ? m_impl->Size() : 0;
     }
-
-    // UE Change Begin: Allow custom instances of <Blob> interface.
-    Blob* CreateBlob(const void* data, uint32_t size)
-    {
-        return new ScBlob(data, size);
-    }
-
-    void DestroyBlob(Blob* blob)
-    {
-        delete blob;
-    }
-    // UE Change End: Allow custom instances of <Blob> interface.
 
     Compiler::ResultDesc Compiler::Compile(const SourceDesc& source, const Options& options, const TargetDesc& target)
     {

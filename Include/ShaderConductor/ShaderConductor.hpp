@@ -121,11 +121,6 @@ namespace ShaderConductor
         BlobImpl* m_impl = nullptr;
     };
 
-    // UE Change Begin: Allow custom instances of <Blob> interface.
-    SC_API Blob* CreateBlob(const void* data, uint32_t size);
-    SC_API void DestroyBlob(Blob* blob);
-    // UE Change End: Allow custom instances of <Blob> interface.
-
     class SC_API Compiler
     {
     public:
@@ -207,7 +202,7 @@ namespace ShaderConductor
             // UE Change End: Support reflection & overriding Metal options & resource bindings to generate correct code.
 
             // UE Change Begin: Allow variable typenames to be renamed to support samplerExternalOES in ESSL.
-            std::function<Blob*(const char* variableName, const char* typeName)> variableTypeRenameCallback;
+            std::function<Blob(const char* variableName, const char* typeName)> variableTypeRenameCallback;
             // UE Change End: Allow variable typenames to be renamed to support samplerExternalOES in ESSL.
         };
 
