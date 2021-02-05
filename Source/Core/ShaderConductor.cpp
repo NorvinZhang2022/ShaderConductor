@@ -1126,6 +1126,8 @@ namespace
 
             mslCompiler->set_msl_options(mslOpts);
 
+			// UE Change Begin: Don't re-assign binding slots. This is done with SPIRV-Reflect.
+#if 0
             const auto& resources = mslCompiler->get_shader_resources();
 
             uint32_t textureBinding = 0;
@@ -1141,6 +1143,8 @@ namespace
                 mslCompiler->set_decoration(sampler.id, spv::DecorationBinding, samplerBinding);
                 ++samplerBinding;
             }
+#endif
+			// UE Change End: Don't re-assign binding slots. This is done with SPIRV-Reflect.
         }
 
         if (buildDummySampler)
