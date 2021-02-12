@@ -794,6 +794,14 @@ namespace
             if (options.enableDebugInfo)
                 dxcArgStrings.push_back(L"-fspv-debug=line");
             // UE Change End: Emit SPIRV debug info when asked to.
+            // UE Change Begin: Support for specifying direct arguments to DXC
+            for (uint32_t arg = 0; arg < options.numDXCArgs; ++arg)
+            {
+                std::wstring argUTF16;
+                Unicode::UTF8ToUTF16String(options.DXCArgs[arg], &argUTF16);
+                dxcArgStrings.push_back(argUTF16);
+            }
+            // UE Change End: Support for specifying direct arguments to DXC
             break;
 
         default:

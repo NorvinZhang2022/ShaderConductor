@@ -180,6 +180,10 @@ namespace ShaderConductor
             // UE Change Begin: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
             bool enableFMAPass = false;
             // UE Change End: Specify the Fused-Multiply-Add pass for Metal - we'll define it away later when we can.
+            // UE Change Begin: Support for specifying direct arguments to DXC
+            uint32_t numDXCArgs = 0;
+            const char** DXCArgs = nullptr;
+            // UE Change End: Support for specifying direct arguments to DXC
 
             int optimizationLevel = 3; // 0 to 3, no optimization to most optimization
             ShaderModel shaderModel = {6, 0};
