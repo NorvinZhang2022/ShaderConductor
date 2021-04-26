@@ -1464,7 +1464,10 @@ namespace ShaderConductor
             const size_t spirvSize = source.binarySize / sizeof(uint32_t);
 
             spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_3);
-            uint32_t options = SPV_BINARY_TO_TEXT_OPTION_NONE | SPV_BINARY_TO_TEXT_OPTION_INDENT | SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+			// UE Change Begin: Enable comments to improve readability for SPIR-V disassembly
+            uint32_t options =
+                SPV_BINARY_TO_TEXT_OPTION_COMMENT | SPV_BINARY_TO_TEXT_OPTION_INDENT | SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+            // UE Change End: Enable comments to improve readability for SPIR-V disassembly
             spv_text text = nullptr;
             spv_diagnostic diagnostic = nullptr;
 
