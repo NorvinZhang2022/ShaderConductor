@@ -35,6 +35,9 @@
 #include <cassert>
 #include <fstream>
 #include <memory>
+// UE Change Begin: Allow remapping of variables in glsl
+#include <sstream>
+// UE Change End: Allow remapping of variables in glsl
 
 #include <dxc/DxilContainer/DxilContainer.h>
 #include <dxc/dxcapi.h>
@@ -89,6 +92,15 @@ static bool ParseSpirvCrossOption(const ShaderConductor::MacroDefine& define, co
     {                                                   \
         return true;                                    \
     }
+
+static bool ParseSpirvCrossOptionGlsl(spirv_cross::CompilerGLSL::Options& opt, const ShaderConductor::MacroDefine& define)
+{
+    PARSE_SPIRVCROSS_OPTION(define, "emit_push_constant_as_uniform_buffer", opt.emit_push_constant_as_uniform_buffer);
+    PARSE_SPIRVCROSS_OPTION(define, "emit_uniform_buffer_as_plain_uniforms", opt.emit_uniform_buffer_as_plain_uniforms);
+    PARSE_SPIRVCROSS_OPTION(define, "flatten_multidimensional_arrays", opt.flatten_multidimensional_arrays);
+    PARSE_SPIRVCROSS_OPTION(define, "force_flattened_io_blocks", opt.force_flattened_io_blocks);
+    return false;
+}
 
 static bool ParseSpirvCrossOptionMetal(spirv_cross::CompilerMSL::Options& opt, const ShaderConductor::MacroDefine& define)
 {
@@ -675,6 +687,45 @@ namespace
         return shaderProfile;
     }
 
+    // UE Change Begin: Allow remapping of variables in glsl
+    struct Remap
+    {
+        std::string src_name;
+        std::string dst_name;
+        unsigned components;
+    };
+
+    static bool remap_generic(spirv_cross::Compiler& compiler, const spirv_cross::SmallVector<spirv_cross::Resource>& resources,
+                              const Remap& remap)
+    {
+        auto itr = std::find_if(std::begin(resources), std::end(resources),
+                                [&remap](const spirv_cross::Resource& res) { return res.name == remap.src_name; });
+
+        if (itr != std::end(resources))
+        {
+            compiler.set_remapped_variable_state(itr->id, true);
+            compiler.set_name(itr->id, remap.dst_name);
+            compiler.set_subpass_input_remapped_components(itr->id, remap.components);
+            return true;
+        }
+        else
+            return false;
+    }
+
+    static void remap(spirv_cross::Compiler& compiler, const spirv_cross::ShaderResources& res, const std::vector<Remap>& remaps)
+    {
+        for (auto& remap : remaps)
+        {
+            if (remap_generic(compiler, res.stage_inputs, remap))
+                return;
+            if (remap_generic(compiler, res.stage_outputs, remap))
+                return;
+            if (remap_generic(compiler, res.subpass_inputs, remap))
+                return;
+        }
+    }
+    // UE Change End: Allow remapping of variables in glsl
+
     void ConvertDxcResult(Compiler::ResultDesc& result, IDxcOperationResult* dxcResult, ShadingLanguage targetLanguage, bool asModule)
     {
         HRESULT status;
@@ -959,6 +1010,10 @@ namespace
         bool combinedImageSamplers = false;
         bool buildDummySampler = false;
 
+        // UE Change Begin: Allow remapping of variables in glsl
+        std::vector<Remap> remaps;
+        // UE Change End: Allow remapping of variables in glsl
+
         switch (target.language)
         {
         case ShadingLanguage::Hlsl:
@@ -1092,6 +1147,41 @@ namespace
         // UE Change Begin: Allow variable typenames to be renamed to support samplerExternalOES in ESSL.
 		if (target.language == ShadingLanguage::Essl)
         {
+            auto* glslCompiler = static_cast<spirv_cross::CompilerGLSL*>(compiler.get());
+            auto glslOpts = glslCompiler->get_common_options();
+
+            for (unsigned i = 0; i < target.numOptions; i++)
+            {
+                auto& Define = target.options[i];
+                if (!ParseSpirvCrossOptionGlsl(glslOpts, Define))
+                {
+                    // UE Change Begin: Allow remapping of variables in glsl
+                    if (!strcmp(Define.name, "remap_glsl"))
+                    {
+                        std::vector<std::string> Args;
+                        std::stringstream ss(Define.value);
+                        std::string Arg;
+
+                        while (std::getline(ss, Arg, ' '))
+                        {
+                            Args.push_back(Arg);
+                        }
+
+                        if (Args.size() < 3)
+                            continue;
+
+                        remaps.push_back({Args[0], Args[1], (uint32_t)std::atoi(Args[2].c_str())});
+                    }
+                    // UE Change End: Allow remapping of variables in glsl
+                }
+            }
+
+            // UE Change Begin: Allow remapping of variables in glsl
+            remap(*glslCompiler, glslCompiler->get_shader_resources(), remaps);
+            // UE Change End: Allow remapping of variables in glsl
+
+            glslCompiler->set_common_options(glslOpts);
+
             if (target.variableTypeRenameCallback)
             {
                 compiler->set_variable_type_remap_callback(
