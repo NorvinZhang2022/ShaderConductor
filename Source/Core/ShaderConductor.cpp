@@ -1151,6 +1151,9 @@ namespace
         opts.flatten_multidimensional_arrays = false;
         opts.enable_420pack_extension =
             (target.language == ShadingLanguage::Glsl) && ((target.version == nullptr) || (opts.version >= 420));
+        // UE Change Begin: Fixup layout locations to include padding for arrays.
+        opts.fixup_layout_locations = true;
+        // UE Change End: Fixup layout locations to include padding for arrays.
         // UE Change Begin: Always enable Vulkan semantics if we don't target GLSL or ESSL
         opts.vulkan_semantics = !(target.language == ShadingLanguage::Glsl || target.language == ShadingLanguage::Essl);
         // UE Change End: Always enable Vulkan semantics if we don't target GLSL or ESSL
