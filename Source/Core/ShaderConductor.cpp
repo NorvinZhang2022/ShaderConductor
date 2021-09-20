@@ -93,12 +93,27 @@ static bool ParseSpirvCrossOption(const ShaderConductor::MacroDefine& define, co
         return true;                                    \
     }
 
+// These options are shared between GLSL, HLSL, and Metal compilers
+static bool ParseSpirvCrossOptionCommon(spirv_cross::CompilerGLSL::Options& opt, const ShaderConductor::MacroDefine& define)
+{
+    PARSE_SPIRVCROSS_OPTION(define, "reconstruct_global_uniforms", opt.reconstruct_global_uniforms);
+    return false;
+}
+
 static bool ParseSpirvCrossOptionGlsl(spirv_cross::CompilerGLSL::Options& opt, const ShaderConductor::MacroDefine& define)
 {
     PARSE_SPIRVCROSS_OPTION(define, "emit_push_constant_as_uniform_buffer", opt.emit_push_constant_as_uniform_buffer);
     PARSE_SPIRVCROSS_OPTION(define, "emit_uniform_buffer_as_plain_uniforms", opt.emit_uniform_buffer_as_plain_uniforms);
     PARSE_SPIRVCROSS_OPTION(define, "flatten_multidimensional_arrays", opt.flatten_multidimensional_arrays);
     PARSE_SPIRVCROSS_OPTION(define, "force_flattened_io_blocks", opt.force_flattened_io_blocks);
+    return false;
+}
+
+static bool ParseSpirvCrossOptionHlsl(spirv_cross::CompilerHLSL::Options& opt, const ShaderConductor::MacroDefine& define)
+{
+    PARSE_SPIRVCROSS_OPTION(define, "reconstruct_semantics", opt.reconstruct_semantics);
+    PARSE_SPIRVCROSS_OPTION(define, "reconstruct_cbuffer_names", opt.reconstruct_cbuffer_names);
+    PARSE_SPIRVCROSS_OPTION(define, "implicit_resource_binding", opt.implicit_resource_binding);
     return false;
 }
 
@@ -1217,6 +1232,18 @@ namespace
                 combinedImageSamplers = true;
                 buildDummySampler = true;
             }
+
+            // UE Change Begin: Support overriding HLSL options.
+            auto commonOpts = hlslCompiler->get_common_options();
+            for (unsigned i = 0; i < target.numOptions; i++)
+            {
+                if (!ParseSpirvCrossOptionCommon(commonOpts, target.options[i]))
+                {
+                    ParseSpirvCrossOptionHlsl(hlslOpts, target.options[i]);
+                }
+            }
+            hlslCompiler->set_common_options(commonOpts);
+            // UE Change End: Support overriding HLSL options.
 
             hlslCompiler->set_hlsl_options(hlslOpts);
         }
