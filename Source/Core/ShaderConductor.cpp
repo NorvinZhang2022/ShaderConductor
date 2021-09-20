@@ -1136,9 +1136,9 @@ namespace
         opts.flatten_multidimensional_arrays = false;
         opts.enable_420pack_extension =
             (target.language == ShadingLanguage::Glsl) && ((target.version == nullptr) || (opts.version >= 420));
-        // UE Change Begin: Always enable Vulkan semantics
-        opts.vulkan_semantics = true;
-        // UE Change End: Always enable Vulkan semantics
+        // UE Change Begin: Always enable Vulkan semantics if we don't target GLSL or ESSL
+        opts.vulkan_semantics = !(target.language == ShadingLanguage::Glsl || target.language == ShadingLanguage::Essl);
+        // UE Change End: Always enable Vulkan semantics if we don't target GLSL or ESSL
         opts.vertex.fixup_clipspace = opts.es;
         opts.vertex.flip_vert_y = opts.es;
         opts.vertex.support_nonzero_base_instance = true;
@@ -1279,7 +1279,10 @@ namespace
 
         if (combinedImageSamplers)
         {
-            compiler->build_combined_image_samplers();
+            // UE Change Begin: For OpenGL based platforms we merge all samplers to a single sampler per texture
+            bool singleSamplerPerTexture = (target.language == ShadingLanguage::Glsl || target.language == ShadingLanguage::Essl);
+            compiler->build_combined_image_samplers(singleSamplerPerTexture);
+            // UE Change End: For OpenGL based platforms we merge all samplers to a single sampler per texture
 
             if (options.inheritCombinedSamplerBindings)
             {
