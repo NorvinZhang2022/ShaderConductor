@@ -289,6 +289,10 @@ namespace ShaderConductor
         // Currently only Dxil on Windows supports linking
         static bool LinkSupport();
         static ResultDesc Link(const LinkDesc& modules, const Options& options, const TargetDesc& target);
+
+        // UE Change Begin: Allow to manually shutdown compiler to avoid dangling mutex on Linux.
+        static void Shutdown();
+        // UE Change End: Allow to manually shutdown compiler to avoid dangling mutex on Linux.
     };
 } // namespace ShaderConductor
 
